@@ -1,0 +1,139 @@
+import datetime
+import PyUber, PyUber.client
+import numpy as np
+import pandas as pd
+
+#SETUP VALUES
+XEUS_source = 'F21_PROD_XEUS'
+
+# Define the SQL query
+query_string = """
+-- CTE to identify the latest operation for each lot
+WITH LatestOperation AS (
+    SELECT
+        RC.LOT,
+        MAX(RC.EXEC_SEQ) AS LATEST_EXEC_SEQ -- Find the maximum EXEC_SEQ for each lot
+    FROM
+        F21S.F_LOT_FLOW RC
+    GROUP BY
+        RC.LOT
+),
+
+-- CTE to aggregate data at the lot level
+LotData AS (
+    SELECT
+        RC.LOT,
+        RC.PRODUCT,
+        SUM(CASE WHEN RC.EXEC_FLAG = 'C' THEN HOURSDIFF(CURRENT_DATE, RC.PREV_OPER_OUT_DATE)
+                 ELSE RC.TOTAL_TIME_AT_OPER / 60 END) AS TOTAL_HRS_AT_OPER, -- Sum of total hours at operation
+        SUM(RC.TOTAL_TIME_AT_OPER_MINUSSTORES / 60) AS TOTAL_HRS_AT_OPER_NO_STORES, -- Sum of total hours at operation minus stores
+        SUM(CASE WHEN RC.REWORK_FLAG = 'N' AND O.PFCFUNCTIONALTYPE = 'MASK' THEN 1 ELSE 0 END) AS MASK_LAYER_COUNT -- Count of mask layers
+    FROM
+       F21S.F_LOT_FLOW RC
+    JOIN 
+       F21S.F_OPERATION O ON RC.OPERATION = O.OPERATION
+    WHERE
+        RC. LOT IN
+            (SELECT FL.LOT
+            FROM F_LOT_RUN_CARD FL 
+            WHERE FL.OPERATION = '6007' 
+              AND FL.LAST_PASS = 'Y' 
+              AND FL.DOTPROCESS LIKE '5051%'
+              AND FL.MOVEDOUT = 'Y' 
+              AND FL.OUT_DATE > SYSDATE - 90)
+        AND O.LATEST_VERSION = 'Y' -- Only consider the latest version of operations
+        AND O.STARTS = 'N' -- Exclude operations that are marked as starts
+        AND RC.LOT_TYPE IN ('PROD', 'ENG', 'TD')
+        AND RC.EXEC_FLAG IN ('M', 'X', 'C')
+        AND RC.LOT_PROCESS LIKE '5051%'
+    GROUP BY
+        RC.LOT, RC.PRODUCT -- Group by lot and product
+),
+
+-- CTE to get the latest OUT_WW for each lot
+LatestOutWW AS (
+    SELECT
+        RC.LOT,
+        RC.OUT_WW -- Select the latest OUT_WW for each lot
+    FROM
+        F21S.F_LOT_FLOW RC
+    JOIN
+        LatestOperation LO ON RC.LOT = LO.LOT AND RC.EXEC_SEQ = LO.LATEST_EXEC_SEQ -- Join with LatestOperation to get the latest EXEC_SEQ
+)
+
+-- Main query to combine the results and calculate DPML values
+SELECT
+    LD.LOT,
+    LD.PRODUCT,
+    LOWW.OUT_WW, -- Include the latest OUT_WW
+    LD.TOTAL_HRS_AT_OPER,
+    LD.TOTAL_HRS_AT_OPER_NO_STORES,
+    LD.MASK_LAYER_COUNT,
+    CASE 
+        WHEN LD.MASK_LAYER_COUNT = 0 THEN NULL
+        ELSE LD.TOTAL_HRS_AT_OPER / 24 / LD.MASK_LAYER_COUNT -- Calculate DPML_TOTAL
+    END AS DPML_TOTAL,
+    CASE 
+        WHEN LD.MASK_LAYER_COUNT = 0 THEN NULL
+        ELSE LD.TOTAL_HRS_AT_OPER_NO_STORES / 24 / LD.MASK_LAYER_COUNT -- Calculate DPML_NO_STORES
+    END AS DPML_NO_STORES
+FROM
+    LotData LD
+JOIN
+    LatestOutWW LOWW ON LD.LOT = LOWW.LOT -- Join with LatestOutWW to include the latest OUT_WW
+ORDER BY
+    LD.MASK_LAYER_COUNT DESC; -- Order by mask layer count in descending order
+    """
+
+#run query
+conn = PyUber.connect(datasource=XEUS_source, TimeOutInSeconds = 6000)
+
+#save query output as dataframe
+DataOut = pd.read_sql_query(query_string, conn)
+
+# Close the database connection
+conn.close()
+
+# Filter out rows where DPML_TOTAL or DPML_NO_STORES is NULL
+df_filtered = DataOut.dropna(subset=['DPML_TOTAL', 'DPML_NO_STORES'], how='all')
+
+# Calculate statistics for DPML_TOTAL
+dpml_total_mean = df_filtered['DPML_TOTAL'].mean()
+dpml_total_95th_percentile = np.percentile(df_filtered['DPML_TOTAL'].dropna(), 95)
+dpml_total_median = df_filtered['DPML_TOTAL'].median()
+dpml_total_50th_percentile = np.percentile(df_filtered['DPML_TOTAL'].dropna(), 50)
+
+# Calculate statistics for DPML_NO_STORES
+dpml_no_stores_mean = df_filtered['DPML_NO_STORES'].mean()
+dpml_no_stores_95th_percentile = np.percentile(df_filtered['DPML_NO_STORES'].dropna(), 95)
+dpml_no_stores_median = df_filtered['DPML_NO_STORES'].median()
+dpml_no_stores_50th_percentile = np.percentile(df_filtered['DPML_NO_STORES'].dropna(), 50)
+
+
+# Create a DataFrame to hold the statistics - Power BI
+stats_df = pd.DataFrame({
+    'Statistic': ['Mean', 'Median','50th Percentile','95th Percentile'],
+    'DPML_TOTAL': [dpml_total_mean, dpml_total_median, dpml_total_50th_percentile, dpml_total_95th_percentile],
+    'DPML_NO_STORES': [dpml_no_stores_mean, dpml_no_stores_50th_percentile , dpml_no_stores_median, dpml_no_stores_95th_percentile]
+})
+
+# Format the statistics to 2 decimal places - Power BI
+stats_df['DPML_TOTAL'] = stats_df['DPML_TOTAL'].round(2)
+stats_df['DPML_NO_STORES'] = stats_df['DPML_NO_STORES'].round(2)
+
+# Output the statistics DataFrame - Power BI
+print(stats_df)
+
+
+# Print the results - Exclude when using Power BI
+print("DPML_TOTAL Statistics:")
+print(f"Mean: {dpml_total_mean:.2f}")
+print(f"Median: {dpml_total_median:.2f}")
+print(f"50th Percentile: {dpml_total_50th_percentile:.2f}")
+print(f"95th Percentile: {dpml_total_95th_percentile:.2f}")
+
+print("\nDPML_NO_STORES Statistics:")
+print(f"Mean: {dpml_no_stores_mean:.2f}")
+print(f"Median: {dpml_no_stores_median:.2f}")
+print(f"50th Percentile: {dpml_no_stores_50th_percentile:.2f}")
+print(f"95th Percentile: {dpml_no_stores_95th_percentile:.2f}")
