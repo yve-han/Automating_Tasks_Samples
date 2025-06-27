@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 #SETUP VALUES
-XEUS_source = 'F21_PROD_XEUS'
+Data_source = 'Data'
 
 # Define the SQL query
 query_string = """
@@ -14,7 +14,7 @@ WITH LatestOperation AS (
         RC.LOT,
         MAX(RC.EXEC_SEQ) AS LATEST_EXEC_SEQ -- Find the maximum EXEC_SEQ for each lot
     FROM
-        F21S.F_LOT_FLOW RC
+        RC
     GROUP BY
         RC.LOT
 ),
@@ -29,36 +29,30 @@ LotData AS (
         SUM(RC.TOTAL_TIME_AT_OPER_MINUSSTORES / 60) AS TOTAL_HRS_AT_OPER_NO_STORES, -- Sum of total hours at operation minus stores
         SUM(CASE WHEN RC.REWORK_FLAG = 'N' AND O.PFCFUNCTIONALTYPE = 'MASK' THEN 1 ELSE 0 END) AS MASK_LAYER_COUNT -- Count of mask layers
     FROM
-       F21S.F_LOT_FLOW RC
+       RC
     JOIN 
-       F21S.F_OPERATION O ON RC.OPERATION = O.OPERATION
+       O ON RC.OPERATION = O.OPERATION
     WHERE
         RC. LOT IN
             (SELECT FL.LOT
-            FROM F_LOT_RUN_CARD FL 
-            WHERE FL.OPERATION = '6007' 
-              AND FL.LAST_PASS = 'Y' 
-              AND FL.DOTPROCESS LIKE '5051%'
-              AND FL.MOVEDOUT = 'Y' 
-              AND FL.OUT_DATE > SYSDATE - 90)
-        AND O.LATEST_VERSION = 'Y' -- Only consider the latest version of operations
-        AND O.STARTS = 'N' -- Exclude operations that are marked as starts
-        AND RC.LOT_TYPE IN ('PROD', 'ENG', 'TD')
-        AND RC.EXEC_FLAG IN ('M', 'X', 'C')
-        AND RC.LOT_PROCESS LIKE '5051%'
+            FROM FL 
+            WHERE
+                O.LATEST_VERSION = 'Y'
+                AND O.STARTS = 'N'
+                AND RC.EXEC_FLAG IN ('M', 'X', 'C')
     GROUP BY
-        RC.LOT, RC.PRODUCT -- Group by lot and product
+        RC.LOT, RC.PRODUCT
 ),
 
 -- CTE to get the latest OUT_WW for each lot
 LatestOutWW AS (
     SELECT
         RC.LOT,
-        RC.OUT_WW -- Select the latest OUT_WW for each lot
+        RC.OUT_WW
     FROM
-        F21S.F_LOT_FLOW RC
+        RC
     JOIN
-        LatestOperation LO ON RC.LOT = LO.LOT AND RC.EXEC_SEQ = LO.LATEST_EXEC_SEQ -- Join with LatestOperation to get the latest EXEC_SEQ
+        LatestOperation LO ON RC.LOT = LO.LOT AND RC.EXEC_SEQ = LO.LATEST_EXEC_SEQ
 )
 
 -- Main query to combine the results and calculate DPML values
@@ -86,7 +80,7 @@ ORDER BY
     """
 
 #run query
-conn = PyUber.connect(datasource=XEUS_source, TimeOutInSeconds = 6000)
+conn = PyUber.connect(datasource=Data_source, TimeOutInSeconds = 6000)
 
 #save query output as dataframe
 DataOut = pd.read_sql_query(query_string, conn)
