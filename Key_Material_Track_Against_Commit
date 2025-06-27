@@ -4,10 +4,10 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-#SETUP VALUES
-XEUS_source = 'F21_PROD_XEUS'
+#SETUP Data source value
+Data_source = 'Data Source'
 
-# Define the SQL query
+# SQL query
 query_string = """
 SELECT flf.lot,
        flf.operation,
@@ -23,57 +23,49 @@ SELECT flf.lot,
        flf.exec_flag,
        flf.MERGE_FLAG
        
-FROM F21S.F_LOT_FLOW flf
+FROM flf
 LEFT JOIN 
-    (SELECT * FROM F21S.F_UDF_PROCESS_OPER
-    WHERE "WHAT_IF#" = 0 and PROCESS = '5051' ) CT ON flf.operation = CT.operation
-LEFT JOIN F21S.F_LOTATTRIBUTE A ON flf.LOT = A.LOT AND A.ATTRIBUTE_NAME = 'DueDate'
+    (SELECT * FROM OPER
+    WHERE PROCESS = '0000' ) CT ON flf.operation = CT.operation
+LEFT JOIN A ON flf.LOT = A.LOT AND A.ATTRIBUTE_NAME = 'DueDate'
 WHERE flf.history_deleted_flag = 'N' 
 and flf.LOT in
       (
-        SELECT L.LOT FROM F21S.F_LOT L
-        LEFT JOIN F21S.F_LOTATTRIBUTE A
-        ON L.LOT = A.LOT
-        WHERE ROUTE LIKE 'FL%'
-        AND DOTPROCESS LIKE '5051%'
-        AND LOT_TYPE = 'TD'
-        AND ATTRIBUTE_NAME = 'DueDate' 
-        AND ATTRIBUTE_VALUE is not null
-        AND LOT_STATE = 'Active'
+      -- Required condition in different data
       )
 ORDER BY flf.EXEC_SEQ
 """
 
-# Run query
-conn = PyUber.connect(datasource=XEUS_source, TimeOutInSeconds=6000)
+#Query run
+conn = PyUber.connect(datasource=Data_source, TimeOutInSeconds=6000)
 
-# Save query output as DataFrame
+# Data fram creation
 DataOut = pd.read_sql_query(query_string, conn)
 
-# Close the database connection
+#connection close
 conn.close()
 
-# Filter out operations with non-null OUT_DATE
+# CT Calc part 1 - Filter lots with no out date
 DataOut = DataOut[DataOut['OUT_DATE'].isnull()]
 
-# Sort by 'LOT' and 'EXEC_SEQ' to ensure correct order
+# CT Calc part 2 - Correctly sort the list in process flow sequence
 DataOut = DataOut.sort_values(by=['LOT', 'EXEC_SEQ'])
 
-# Calculate the total PLAN_CYCLE_TIME for each lot where OUT_DATE is null
+# CT Calc part 3 - Calculate the total CT where lots don't have out date
 total_plan_cycle_time = DataOut.groupby('LOT')['PLAN_CYCLE_TIME'].sum().reset_index()
 total_plan_cycle_time.rename(columns={'PLAN_CYCLE_TIME': 'PLAN_CYCLE_TIME_Total'}, inplace=True)
 
-# Get the first operation for each lot where OUT_DATE is null
+# First operation with no out date identify
 first_operation = DataOut.drop_duplicates(subset='LOT', keep='first')
 
 # Merge the total_plan_cycle_time back to the first_operation DataFrame
 result_df = first_operation.merge(total_plan_cycle_time, on='LOT')
 
-# Verify column names before selecting
-print(result_df.columns)
+# Check:
+# print(result_df.columns)
 
-# Select relevant columns to display
+# Filter / Select only needed columns for visualization in Power BI
 result_df = result_df[['LOT', 'OPERATION', 'OPER_SHORT_DESC', 'DUE_DATE', 'PLAN_CYCLE_TIME_Total']]
 
-# Display the result
-print(result_df)
+# Display the result - for brief check only
+# print(result_df)
