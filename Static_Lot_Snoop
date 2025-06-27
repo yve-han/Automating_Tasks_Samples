@@ -72,10 +72,10 @@ SELECT DISTINCT
   WH.CORPORATE_EMAIL AS HO_EMAIL,
   WL.CORPORATE_EMAIL AS LO_EMAIL,
   WL.FIRST_NAME AS LO_NAME
-FROM F21S.F_LOT T0
-JOIN F21S.F_EXPERIMENT T3 ON T0.LOT = T3.LOT
-LEFT JOIN F21S.F_WORKER WL ON T0.LOT_OWNER = WL.IDSID
-LEFT JOIN F21S.F_WORKER WH ON SUBSTR(T0.HOLD_NAME, 5) = WH.IDSID
+FROM T0
+JOIN T3 ON T0.LOT = T3.LOT
+LEFT JOIN WL ON T0.LOT_OWNER = WL.IDSID
+LEFT JOIN WH ON SUBSTR(T0.HOLD_NAME, 5) = WH.IDSID
 LEFT JOIN (
       SELECT 
          LOT,
@@ -87,11 +87,9 @@ LEFT JOIN (
       WHERE RN = 1
       ) T5 ON T0.LOT = T5.LOT and T0.OPERATION = T5.OPERATION
 WHERE T0.TERMINATED = 'N' 
-      and T0.DOTPROCESS like '5051%'
       and T0.ONHOLD = 'Y'
       and T0.PRODUCT not like 'NOPROD%'
       and T0.LOT_TYPE not like 'MW'
-      AND T0.LOT like 'W%'
 """
 
 # Function to create HTML table
@@ -126,7 +124,7 @@ def send_email(to_email, cc_email, subject, html_content):
 # Query Process
 def send_emails():
     try:
-        conn = PyUber.connect(datasource=XEUS_source, TimeOutInSeconds=6000)
+        conn = PyUber.connect(datasource=source, TimeOutInSeconds=6000)
         logging.info("Database connection established.")
         
         query_df = pd.read_sql_query(prime_query, conn)
