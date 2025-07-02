@@ -20,11 +20,7 @@ WITH CombinedData AS (
     FROM T6
     UNION ALL
     SELECT
-        LOT,
-        OPERATION,
-        TXN_DATE AS DATE_COLUMN,
-        "TRANSACTION" AS TYPE,
-        COMMENTS AS TEXT
+        *** -- Company sensitive information removed from the query
     FROM T5
 ),
 RankedData AS (
@@ -45,12 +41,7 @@ JOIN T3 ON T0.LOT = T3.LOT
 LEFT JOIN WL ON T0.LOT_OWNER = WL.**
 LEFT JOIN WH ON SUBSTR(T0.HOLD_NAME, 5) = WH.**
 LEFT JOIN (
-      SELECT 
-         LOT,
-         OPERATION,
-         TXN_DATE,
-         "TRANSACTION",
-         COMMENTS
+      *** -- Company sensitive information removed from the query
       FROM LATESTT5
       WHERE RN = 1
       ) T5 ON T0.LOT = T5.LOT and T0.OPERATION = T5.OPERATION
@@ -67,7 +58,7 @@ def create_html_table(dataframe):
 
 # Function to send email
 def send_email(to_email, cc_email, subject, html_content):
-    email_user = 'NMDMOPROD@intel.com'
+    email_user = 'XX@intel.com'
 
     msg = MIMEMultipart()
     msg['From'] = email_user
