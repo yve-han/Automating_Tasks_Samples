@@ -9,29 +9,17 @@ Data_source = 'Data Source'
 
 # SQL query
 query_string = """
-SELECT flf.lot,
-       flf.operation,
-       flf.OPER_SHORT_DESC,
-       TIMESTAMP_FORMAT(flf.out_date, 'YYYYMMDD HH24:MI:SS.FF') AS out_date,
-       TIMESTAMP_FORMAT(A.ATTRIBUTE_VALUE, 'YYYYMMDD HH24:MI:SS.FF') AS Due_Date,
-       CT.PLAN_CYCLE_TIME,
-       flf.product,
-       flf.exec_seq,
-       flf.lot_type,
-       flf.lot_process,
-       flf.lot7,
-       flf.exec_flag,
-       flf.MERGE_FLAG
-       
+SELECT 
+       *** -- Company sensitive information removed from the query     
 FROM flf
 LEFT JOIN 
     (SELECT * FROM OPER
     WHERE PROCESS = '0000' ) CT ON flf.operation = CT.operation
-LEFT JOIN A ON flf.LOT = A.LOT AND A.ATTRIBUTE_NAME = 'DueDate'
+LEFT JOIN A ON flf.LOT = A.LOT
 WHERE flf.history_deleted_flag = 'N' 
 and flf.LOT in
       (
-      -- Required condition in different data
+      *** -- Company sensitive information removed from the query   
       )
 ORDER BY flf.EXEC_SEQ
 """
@@ -55,7 +43,7 @@ DataOut = DataOut.sort_values(by=['LOT', 'EXEC_SEQ'])
 total_plan_cycle_time = DataOut.groupby('LOT')['PLAN_CYCLE_TIME'].sum().reset_index()
 total_plan_cycle_time.rename(columns={'PLAN_CYCLE_TIME': 'PLAN_CYCLE_TIME_Total'}, inplace=True)
 
-# First operation with no out date identify
+# Identify current operation with no outdate yet (name as first_operation)
 first_operation = DataOut.drop_duplicates(subset='LOT', keep='first')
 
 # Merge the total_plan_cycle_time back to the first_operation DataFrame
