@@ -47,10 +47,7 @@ This repository showcases three real-world Python + SQL projects used to extract
 ## 📁 Repo Structure
 
 work_sample_repository/
-├── key_material_track_against_commit.py
-├── material_velocity_history.py
-├── static_material_sniffer.py
-└── README.md
+<pre> ```text work_sample_repository/ ├── key_material_track_against_commit.py ├── material_velocity_history.py ├── static_material_sniffer.py └── README.md ``` </pre>
 
 ---
 
