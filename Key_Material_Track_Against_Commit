@@ -52,8 +52,3 @@ result_df = first_operation.merge(total_plan_cycle_time, on='LOT')
 # Check:
 # print(result_df.columns)
 
-# Filter / Select only needed columns for visualization in Power BI
-result_df = result_df[['LOT', 'OPERATION', 'OPER_SHORT_DESC', 'DUE_DATE', 'PLAN_CYCLE_TIME_Total']]
-
-# Display the result - for brief check only
-# print(result_df)
