@@ -58,7 +58,7 @@ def create_html_table(dataframe):
 
 # Function to send email
 def send_email(to_email, cc_email, subject, html_content):
-    email_user = 'XX@intel.com'
+    email_user = 'XX@company.com'
 
     msg = MIMEMultipart()
     msg['From'] = email_user
@@ -70,7 +70,7 @@ def send_email(to_email, cc_email, subject, html_content):
 
     try:
     # Connect to the SMTP server without specifying a port
-        with smtplib.SMTP('smtp.intel.com') as smtp_server:
+        with smtplib.SMTP('smtp.company.com') as smtp_server:
             smtp_server.sendmail(email_user, [to_email, cc_email], msg.as_string())
             logging.info(f"Email sent to {to_email} with CC to {cc_email} and subject '{subject}'.")
     except Exception as e:
@@ -91,7 +91,7 @@ def send_emails():
         # Print DataFrame columns for debugging
         print("DataFrame columns:", query_df.columns)
 
-        email_user = 'XX@intel.com'
+        email_user = 'XX@company.com'
         
 
         # Group by HOLD_NAME_EMAIL for ONHOLD lots
@@ -103,7 +103,7 @@ def send_emails():
             
             # Override the recipient email with the test email address for testing
             to_email = email
-            #cc_email = 'XY@intel.com','XZ@intel.com' # CC the lot owner email group['LOT_OWNER_EMAIL'].iloc[0]
+            #cc_email = 'XY@company.com','XZ@company.com' # CC the lot owner email group['LOT_OWNER_EMAIL'].iloc[0]
 
             # Construct the email content
             body = f"Hello {first_name},<br><br>Please help to comment/disposition the lots under your name with ECD:<br><br>"
