@@ -21,6 +21,7 @@ This repository showcases three real-world Python + SQL projects used to extract
 - Computes statistics like mean, median, and 95th percentile for DPML
 - Generates a formatted DataFrame for visualization in Power BI
 - Useful for fab efficiency and variability monitoring
+- Used as a initiation point to develop more comprehensive company-wide PowerBI dashboard
 
 ---
 
