@@ -8,75 +8,49 @@ Data_source = 'Data'
 
 # Define the SQL query
 query_string = """
--- CTE to identify the latest operation for each lot
+-- Identify the latest operation for each lot:
 WITH LatestOperation AS (
     SELECT
-        RC.LOT,
-        MAX(RC.EXEC_SEQ) AS LATEST_EXEC_SEQ -- Find the maximum EXEC_SEQ for each lot
+        *** -- Company sensitive information removed from the query   
     FROM
         RC
     GROUP BY
         RC.LOT
 ),
 
--- CTE to aggregate data at the lot level
+-- Aggregate data at the lot level:
 LotData AS (
     SELECT
-        RC.LOT,
-        RC.PRODUCT,
-        SUM(CASE WHEN RC.EXEC_FLAG = 'C' THEN HOURSDIFF(CURRENT_DATE, RC.PREV_OPER_OUT_DATE)
-                 ELSE RC.TOTAL_TIME_AT_OPER / 60 END) AS TOTAL_HRS_AT_OPER, -- Sum of total hours at operation
-        SUM(RC.TOTAL_TIME_AT_OPER_MINUSSTORES / 60) AS TOTAL_HRS_AT_OPER_NO_STORES, -- Sum of total hours at operation minus stores
-        SUM(CASE WHEN RC.REWORK_FLAG = 'N' AND O.PFCFUNCTIONALTYPE = 'MASK' THEN 1 ELSE 0 END) AS MASK_LAYER_COUNT -- Count of mask layers
+       *** -- Company sensitive information removed from the query   
     FROM
        RC
     JOIN 
        O ON RC.OPERATION = O.OPERATION
     WHERE
-        RC. LOT IN
-            (SELECT FL.LOT
-            FROM FL 
-            WHERE
-                O.LATEST_VERSION = 'Y'
-                AND O.STARTS = 'N'
-                AND RC.EXEC_FLAG IN ('M', 'X', 'C')
+     *** -- Company sensitive information removed from the query   
     GROUP BY
         RC.LOT, RC.PRODUCT
 ),
 
--- CTE to get the latest OUT_WW for each lot
+-- Get the latest OUT_WW for each lot:
 LatestOutWW AS (
     SELECT
-        RC.LOT,
-        RC.OUT_WW
+      *** -- Company sensitive information removed from the query   
     FROM
         RC
     JOIN
         LatestOperation LO ON RC.LOT = LO.LOT AND RC.EXEC_SEQ = LO.LATEST_EXEC_SEQ
 )
 
--- Main query to combine the results and calculate DPML values
+-- Main query to combine the results and calculate DPML values:
 SELECT
-    LD.LOT,
-    LD.PRODUCT,
-    LOWW.OUT_WW, -- Include the latest OUT_WW
-    LD.TOTAL_HRS_AT_OPER,
-    LD.TOTAL_HRS_AT_OPER_NO_STORES,
-    LD.MASK_LAYER_COUNT,
-    CASE 
-        WHEN LD.MASK_LAYER_COUNT = 0 THEN NULL
-        ELSE LD.TOTAL_HRS_AT_OPER / 24 / LD.MASK_LAYER_COUNT -- Calculate DPML_TOTAL
-    END AS DPML_TOTAL,
-    CASE 
-        WHEN LD.MASK_LAYER_COUNT = 0 THEN NULL
-        ELSE LD.TOTAL_HRS_AT_OPER_NO_STORES / 24 / LD.MASK_LAYER_COUNT -- Calculate DPML_NO_STORES
-    END AS DPML_NO_STORES
+*** -- Company sensitive information removed from the query   
 FROM
     LotData LD
 JOIN
-    LatestOutWW LOWW ON LD.LOT = LOWW.LOT -- Join with LatestOutWW to include the latest OUT_WW
+    LatestOutWW LOWW ON LD.LOT = LOWW.LOT
 ORDER BY
-    LD.MASK_LAYER_COUNT DESC; -- Order by mask layer count in descending order
+    LD.MASK_LAYER_COUNT DESC; 
     """
 
 #run query
@@ -88,46 +62,32 @@ DataOut = pd.read_sql_query(query_string, conn)
 # Close the database connection
 conn.close()
 
-# Filter out rows where DPML_TOTAL or DPML_NO_STORES is NULL
+# Filter out "NULL" rows from DPML_TOTAL or DPML_NO_STORES columns
 df_filtered = DataOut.dropna(subset=['DPML_TOTAL', 'DPML_NO_STORES'], how='all')
 
-# Calculate statistics for DPML_TOTAL
+# Calculate statistics for DPML_TOTAL:
 dpml_total_mean = df_filtered['DPML_TOTAL'].mean()
 dpml_total_95th_percentile = np.percentile(df_filtered['DPML_TOTAL'].dropna(), 95)
 dpml_total_median = df_filtered['DPML_TOTAL'].median()
 dpml_total_50th_percentile = np.percentile(df_filtered['DPML_TOTAL'].dropna(), 50)
 
-# Calculate statistics for DPML_NO_STORES
+# Calculate statistics for DPML_NO_STORES:
 dpml_no_stores_mean = df_filtered['DPML_NO_STORES'].mean()
 dpml_no_stores_95th_percentile = np.percentile(df_filtered['DPML_NO_STORES'].dropna(), 95)
 dpml_no_stores_median = df_filtered['DPML_NO_STORES'].median()
 dpml_no_stores_50th_percentile = np.percentile(df_filtered['DPML_NO_STORES'].dropna(), 50)
 
 
-# Create a DataFrame to hold the statistics - Power BI
+# PowerBI DataFrame Store:
 stats_df = pd.DataFrame({
     'Statistic': ['Mean', 'Median','50th Percentile','95th Percentile'],
     'DPML_TOTAL': [dpml_total_mean, dpml_total_median, dpml_total_50th_percentile, dpml_total_95th_percentile],
     'DPML_NO_STORES': [dpml_no_stores_mean, dpml_no_stores_50th_percentile , dpml_no_stores_median, dpml_no_stores_95th_percentile]
 })
 
-# Format the statistics to 2 decimal places - Power BI
+# Formating to show upto 2 decimal places:
 stats_df['DPML_TOTAL'] = stats_df['DPML_TOTAL'].round(2)
 stats_df['DPML_NO_STORES'] = stats_df['DPML_NO_STORES'].round(2)
 
 # Output the statistics DataFrame - Power BI
 print(stats_df)
-
-
-# Print the results - Exclude when using Power BI
-print("DPML_TOTAL Statistics:")
-print(f"Mean: {dpml_total_mean:.2f}")
-print(f"Median: {dpml_total_median:.2f}")
-print(f"50th Percentile: {dpml_total_50th_percentile:.2f}")
-print(f"95th Percentile: {dpml_total_95th_percentile:.2f}")
-
-print("\nDPML_NO_STORES Statistics:")
-print(f"Mean: {dpml_no_stores_mean:.2f}")
-print(f"Median: {dpml_no_stores_median:.2f}")
-print(f"50th Percentile: {dpml_no_stores_50th_percentile:.2f}")
-print(f"95th Percentile: {dpml_no_stores_95th_percentile:.2f}")
