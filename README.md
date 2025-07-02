@@ -59,7 +59,7 @@ work_sample_repository/
 
 Yve Youjung Han  
 📧 yve.y.han@gmail.com  
-🔗 [LinkedIn](https://www.linkedin.com/in/yvehan)
+🔗 [LinkedIn](https://www.linkedin.com/in/yvehan)  
 🔗 [GitHub](https://github.com/yvehan)
 
 ---
