@@ -12,15 +12,11 @@ logging.basicConfig(level=logging.INFO)
 # Source
 source = 'Company Server'
 
-# SQL Query
+# SQL Query - Detailed notes in SQL server
 prime_query = """
 WITH CombinedData AS (
     SELECT 
-        LOT,
-        OPERATION,
-        COMMENT_TIMESTAMP AS DATE_COLUMN,
-        COMMENT_TYPE AS TYPE,
-        COMMENT_TEXT AS TEXT
+        *** -- Company sensitive information removed from the query
     FROM T6
     UNION ALL
     SELECT
@@ -33,49 +29,21 @@ WITH CombinedData AS (
 ),
 RankedData AS (
     SELECT
-        LOT,
-        OPERATION,
-        DATE_COLUMN,
-        TYPE,
-        TEXT,
-        ROW_NUMBER() OVER (PARTITION BY LOT, OPERATION ORDER BY DATE_COLUMN DESC) AS RN
+    *** -- Company sensitive information removed from the query
     FROM CombinedData
 ),
 LATESTT5 AS (
-    SELECT
-        LOT,
-        OPERATION,
-        DATE_COLUMN AS TXN_DATE,
-        TYPE AS "TRANSACTION",
-        TEXT AS COMMENTS,
-        RN
+    *** -- Company sensitive information removed from the query
     FROM RankedData
     WHERE RN = 1
 )
 
 SELECT DISTINCT 
-  T0.LOT,
-  T0.OPERATION || ' ' || T0.OPER_SHORT_DESC as OPERATION,
-  T0.PRODUCT,
-  T0.DOTPROCESS,
-  T0.LOT_TYPE,
-  T0.LOT_PRIORITY as HB,
-  T5.COMMENTS,
-  T0.LOT_STATE,
-  T0.ONHOLD,
-  ROUND((SYSDATE - T0.PREV_OPER_OUT_DATE)*24,2) as HAO,
-  T0.HOLD_CATEGORY,
-  SUBSTR(T0.HOLD_NAME, 5) as HOLD_NAME,
-  T0.ATSTORES,
-  T0.STORES_CATEGORY,
-  WH.FIRST_NAME AS HO_NAME,
-  WH.CORPORATE_EMAIL AS HO_EMAIL,
-  WL.CORPORATE_EMAIL AS LO_EMAIL,
-  WL.FIRST_NAME AS LO_NAME
+*** -- Company sensitive information removed from the query
 FROM T0
 JOIN T3 ON T0.LOT = T3.LOT
-LEFT JOIN WL ON T0.LOT_OWNER = WL.IDSID
-LEFT JOIN WH ON SUBSTR(T0.HOLD_NAME, 5) = WH.IDSID
+LEFT JOIN WL ON T0.LOT_OWNER = WL.**
+LEFT JOIN WH ON SUBSTR(T0.HOLD_NAME, 5) = WH.**
 LEFT JOIN (
       SELECT 
          LOT,
@@ -86,10 +54,6 @@ LEFT JOIN (
       FROM LATESTT5
       WHERE RN = 1
       ) T5 ON T0.LOT = T5.LOT and T0.OPERATION = T5.OPERATION
-WHERE T0.TERMINATED = 'N' 
-      and T0.ONHOLD = 'Y'
-      and T0.PRODUCT not like 'NOPROD%'
-      and T0.LOT_TYPE not like 'MW'
 """
 
 # Function to create HTML table
@@ -114,7 +78,7 @@ def send_email(to_email, cc_email, subject, html_content):
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        # Connect to the SMTP server without specifying a port
+    # Connect to the SMTP server without specifying a port
         with smtplib.SMTP('smtp.intel.com') as smtp_server:
             smtp_server.sendmail(email_user, [to_email, cc_email], msg.as_string())
             logging.info(f"Email sent to {to_email} with CC to {cc_email} and subject '{subject}'.")
@@ -136,7 +100,7 @@ def send_emails():
         # Print DataFrame columns for debugging
         print("DataFrame columns:", query_df.columns)
 
-        email_user = 'NMDMOPROD@intel.com'
+        email_user = 'XX@intel.com'
         
 
         # Group by HOLD_NAME_EMAIL for ONHOLD lots
@@ -148,7 +112,7 @@ def send_emails():
             
             # Override the recipient email with the test email address for testing
             to_email = email
-            #cc_email = 'f11x.roc.line.co@intel.com','nm.captains@intel.com' # CC the lot owner email group['LOT_OWNER_EMAIL'].iloc[0]
+            #cc_email = 'XY@intel.com','XZ@intel.com' # CC the lot owner email group['LOT_OWNER_EMAIL'].iloc[0]
 
             # Construct the email content
             body = f"Hello {first_name},<br><br>Please help to comment/disposition the lots under your name with ECD:<br><br>"
@@ -159,21 +123,21 @@ def send_emails():
 
         '''
         # Group by LOT_OWNER_EMAIL for specific LOT_STATE values
-        stores_grouped = query_df[query_df['LOT_STATE'].isin(['StoresWaitingPE', 'StoresWaitingIntegration'])].groupby('LO_EMAIL')
+        stores_grouped = query_df[query_df['LOT_STATE'].isin(['XXX', 'XYZ'])].groupby('LO_EMAIL')
 
         for email, group in stores_grouped:
             first_name = group['LO_NAME'].iloc[0]
-            subject = "[P5051 Help Needed] Stores Lot Disposition"
+            subject = "Stored Material Disposition"
             
             # Override the recipient email with the test email address for testing
             to_email = test_email #change to: email
 
             # Construct the email content
-            body = f"Hello {first_name},<br><br>Please help to comment/disposition the lots under your name with ECD:<br><br>"
+            body = f"Hello {first_name},<br><br>Please help to comment/disposition the materials under your name with ECD:<br><br>"
             html_content = body + create_html_table(group)
 
             # Send the email
-            send_email(to_email, '', subject, html_content)  # No CC for stores lots 
+            send_email(to_email, '', subject, html_content)  # No CC for stored lots 
         '''
 
     except Exception as e:
